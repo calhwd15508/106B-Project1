@@ -1,0 +1,4 @@
+float64 thrustdot2
+float64 pitchdot2
+float64 rolldot2
+float64 yawdot2
