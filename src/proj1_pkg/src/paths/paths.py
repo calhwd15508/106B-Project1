@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+l#!/usr/bin/env python
 
 """
 Starter script for lab1. 
@@ -8,10 +8,12 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
+
 from utils.utils import *
 
 try:
     import rospy
+    from geometry_msgs.msg import Pose, PoseStamped, Point
     from moveit_msgs.msg import RobotTrajectory
     from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 except:
@@ -236,9 +238,7 @@ class LinearPath(MotionPath):
         """
         self.tag_pos = tag_pos[0]
         #STARTING POSITION (YOU PROBABLY HAVE TO CHANGE THESE VALUES)
-        self.start_x = 0
-        self.start_y = 0
-        self.start_z = self.tag_pos[2] + 2
+        self.start_pos = limb.endpoint_pose()['position'];
         MotionPath.__init__(self, limb, kin, total_time)
 
     def target_position(self, time):
@@ -254,10 +254,10 @@ class LinearPath(MotionPath):
         3x' :obj:`numpy.ndarray`
             desired x,y,z position in workspace coordinates of the end effector
         """
-        if (time == 0):
-            return np.array([self.start_x, self.start_y, self.start_z])
-        index = time/self.total_time
-        return np.array([(tag_pos[0] - self.start_x) * index + self.start_x, (tag_pos[1] - self.start_y) * index + self.start_y, self.start_z])
+        if (time <= 0):
+            return np.array([self.start_pos.x, self.start_pos.y, self.start_pos.z])
+        index = max(time/self.total_time, 1)
+        return np.array([(tag_pos[0] - self.start_pos.x) * index + self.start_pos.x, (tag_ps[1] - self.start_pos.y) * index + self.start_pos.y, (tag_pos[2] - self.star_pos.z) * index + self.star_pos.z])
 
     def target_velocity(self, time):
         """
@@ -275,7 +275,9 @@ class LinearPath(MotionPath):
             desired velocity in workspace coordinates of the end effector
         """
         #NOT REALLY SURE ABOUT THIS PART, IF YOU LOOK AT THE CODE, I'M NOT EVEN SURE THIS IS CALLED IF USING MOVE_IT
-        return np.array([(tag_pos[0] - self.start_x) / self.total_time, (tag_pos[1] - self.start_y) / self.total_time, 0])
+        if (time <= 0 or time > self.total_time):
+            return np.zeros(3)
+        return np.array([(tag_pos[0] - self.start_pos.x) / self.total_time, (tag_pos[1] - self.start_pos.y) / self.total_time, (tag_pos[2] - self.start_pos.z) / self.total_time])
 
     def target_acceleration(self, time):
         """
@@ -310,9 +312,9 @@ class CircularPath(MotionPath):
         #the idea is to start some set distance away in the x direction
         #as degree increments, the target position increments
         self.radius = 2
-        self.start_x = self.tag_pos[0] + self.radius
-        self.start_y = self.tag_pos[1]
-        self.start_z = self.tag_pos[2] + 2
+        self.start_pos.x = self.tag_pos[0]
+        self.start_pos.y = self.tag_pos[1]
+        self.start_pos.z = self.tag_pos[2] + 2
 
         #linear velocity = angular velocity * radius
         ang_velocity = 2 * math.pi / self.total_time
@@ -332,9 +334,9 @@ class CircularPath(MotionPath):
         """
         #SUPER not sure about this one... basically a guess that this will work
         if (time == 0):
-            return np.array([self.start_x, self.start_y, self.start_z])
+            return np.array([self.start_pos.x, self.start_pos.y, self.start_pos.z])
         theta = math.pi * 2 * (time / self.total_time)
-        return np.array([self.radius * math.cos(theta) + self.start_x, self.radius * math.sin(theta) + self.start_y, self.start_z])
+        return np.array([self.radius * math.cos(theta) + self.start_pos.x, self.radius * math.sin(theta) + self.start_pos.y, self.start_pos.z])
 
     def target_velocity(self, time):
         """
