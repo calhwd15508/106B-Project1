@@ -227,7 +227,7 @@ class MotionPath:
         return theta
 
 class LinearPath(MotionPath):
-    def __init__(self, limb, kin, total_time, tag_pos):
+    def __init__(self, limb, start_pos = None, kin, total_time, tag_pos):
         """
         Remember to call the constructor of MotionPath
 
@@ -238,7 +238,10 @@ class LinearPath(MotionPath):
         """
         self.tag_pos = tag_pos[0]
         #STARTING POSITION (YOU PROBABLY HAVE TO CHANGE THESE VALUES)
-        self.start_pos = limb.endpoint_pose()['position'];
+        if (start_pos == None):
+            self.start_pos = limb.endpoint_pose()['position'];
+        else:
+            self.start_pos = start_pos
         MotionPath.__init__(self, limb, kin, total_time)
 
     def target_position(self, time):
@@ -311,14 +314,11 @@ class CircularPath(MotionPath):
         #STARTING POSITION (YOU PROBABLY HAVE TO CHANGE THESE VALUES)
         #the idea is to start some set distance away in the x direction
         #as degree increments, the target position increments
-        self.radius = 2
-        self.start_pos.x = self.tag_pos[0]
-        self.start_pos.y = self.tag_pos[1]
-        self.start_pos.z = self.tag_pos[2] + 2
+        self.start_pos = limb.endpoint_pose()['position'];
+        self.radius = np.array([self.tag_pos[0] - self.start_pos.x, self.tag_pos[1] - self.start_pos.y])
 
         #linear velocity = angular velocity * radius
-        ang_velocity = 2 * math.pi / self.total_time
-        self.lin_velocity = ang_velocity * self.radius
+        self.ang_velocity = 2 * math.pi / self.total_time
         MotionPath.__init__(self, limb, kin, total_time)
 
     def target_position(self, time):
@@ -336,7 +336,8 @@ class CircularPath(MotionPath):
         if (time == 0):
             return np.array([self.start_pos.x, self.start_pos.y, self.start_pos.z])
         theta = math.pi * 2 * (time / self.total_time)
-        return np.array([self.radius * math.cos(theta) + self.start_pos.x, self.radius * math.sin(theta) + self.start_pos.y, self.start_pos.z])
+        rot_vec = rotation2d(theta).dot(self.radius)
+        return np.concatenate((rot_vec, self.start_pos.z - self.tag_pos[2]), axis = 0) + self.tag_pos
 
     def target_velocity(self, time):
         """
@@ -353,7 +354,9 @@ class CircularPath(MotionPath):
         """
         #NOT REALLY SURE ABOUT THIS PART, IF YOU LOOK AT THE CODE, I'M NOT EVEN SURE THIS IS CALLED IF USING MOVE_IT
         theta = math.pi * 2 * (time / self.total_time)
-        return np.array([self.lin_velocity * -1 * math.sin(theta), self.lin_velocity * math.cos(theta), 0])
+        rot_vec = np.concatenate((rotation2d(theta).dot(self.radius), 0), axis = 0)
+        axis_vec = np.array([0, 0, self.ang_velocity])
+        return np.cross(axis_vec, rot_vec)
 
     def target_acceleration(self, time):
         """
@@ -372,7 +375,8 @@ class CircularPath(MotionPath):
         #not really sure what to put here
         #centripetal acceleration?
         #linear (tangential) acceleration is 0?
-        return np.array([0, 0, 0])
+        rot_vec = np.concatenate((rotation2d(theta).dot(self.radius), 0), axis = 0)
+        return -(self.ang_velocity**2 * rot_vec)
 
 class MultiplePaths(MotionPath):
     """
@@ -385,10 +389,10 @@ class MultiplePaths(MotionPath):
     def __init__(self, limb, kin, total_time, tag_pos):
         #go from start to first tag
         self.path1 = LinearPath(limb, kin, total_time / 5, [tag_pos[0]])
-        self.path2 = LinearPath(limb, kin, total_time / 5, [tag_pos[1]])
-        self.path3 = LinearPath(limb, kin, total_time / 5, [tag_pos[2]])
-        self.path4 = LinearPath(limb, kin, total_time / 5, [tag_pos[3]])
-        self.path5 = LinearPath(limb, kin, total_time / 5, [tag_pos[0]])
+        self.path2 = LinearPath(limb, start_pos = path1.target_position(total_time / 5), kin, total_time / 5, [tag_pos[1]])
+        self.path3 = LinearPath(limb, start_pos = path2.target_position(total_time / 5), kin, total_time / 5, [tag_pos[2]])
+        self.path4 = LinearPath(limb, start_pos = path3.target_position(total_time / 5), kin, total_time / 5, [tag_pos[3]])
+        self.path5 = LinearPath(limb, start_pos = path4.target_position(total_time / 5), kin, total_time / 5, [tag_pos[0]])
         MotionPath.__init__(self, limb, kin, total_time)
 
     def target_position(self, time):

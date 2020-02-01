@@ -46,6 +46,8 @@ Baxter RSDK Joint Trajectory Controller
 import argparse
 
 import rospy
+import sys
+import os
 
 from dynamic_reconfigure.server import Server
 
@@ -54,6 +56,9 @@ from baxter_interface.cfg import (
     VelocityJointTrajectoryActionServerConfig,
     PositionFFJointTrajectoryActionServerConfig,
 )
+
+# sys.path.append(os.path.abspath(os.path.join('..', 'src/joint_trajectory_action_server')))
+
 from joint_trajectory_action_server.joint_trajectory_action_server import (
     JointTrajectoryActionServer,
 )
